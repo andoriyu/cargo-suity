@@ -1,0 +1,16 @@
+[global]
+features = []
+format   = "JUnit"
+output   = "./test-results"
+
+[workflow.default]
+doc         = false
+unit        = true
+integration = []
+
+[workflow.integration-0]
+unit        = false
+integration = ["just_me"]
+
+[workflow.integration-1]
+features = ["omgwtf"]
