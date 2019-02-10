@@ -3,7 +3,6 @@ use crate::junit::TestSuite;
 use std::process::{Command};
 use std::io;
 use std::fs;
-use std::ffi::OsStr;
 
 
 use crate::results;
@@ -31,7 +30,7 @@ pub struct Runspec {
     /// Run Doc-Tests or not. Default true.
     pub doc: bool,
     /// Run Unit-Tests or not. Default true.
-    pub unit: bool,
+    pub lib: bool,
     /// List of integration tests to run. Default all of them.
     pub integration: Vec<String>
 }
@@ -43,7 +42,7 @@ impl Default for Runspec {
             format: OutputFormat::default(),
             output: PathBuf::from("test-results/"),
             doc: true,
-            unit: true,
+            lib: true,
             integration: vec![String::from("*")],
         }
     }
@@ -64,7 +63,7 @@ impl Runspec {
             }
             args
         };
-        if self.unit {
+        if self.lib {
             let mut args = {
                 let mut new_args = shared_args.clone();
                 new_args.extend(vec![
@@ -77,7 +76,10 @@ impl Runspec {
             let out = Command::new("cargo").args(&args).output()?;
             let stdout: String = String::from_utf8_lossy(&out.stdout).into();
             let events = results::parse_test_results(&stdout);
-            results.push(TestSuite::new(events, String::from("Unit-tests")));
+            let suite = TestSuite::new(events, String::from("Lib-tests"));
+            if suite.tests > 0 {
+                results.push(suite);
+            }
         }
         if self.doc {
             let mut args = {
@@ -90,20 +92,30 @@ impl Runspec {
             let out = Command::new("cargo").args(&args).output()?;
             let stdout: String = String::from_utf8_lossy(&out.stdout).into();
             let events = results::parse_test_results(&stdout);
-            results.push(TestSuite::new(events, String::from("Doc-tests")));
+            let suite = TestSuite::new(events, String::from("Doc-tests"));
+            if suite.tests > 0 {
+                results.push(suite);
+            }
         }
 
         if !self.integration.is_empty() {
             if self.integration == vec!["*"] {
                 let tests = get_integration_tests();
+                dbg!(&tests);
                 for test in tests {
                     if let Some(path) = map_to_binary(&test) {
                         let mut args = Vec::with_capacity(3);
                         add_common_args(&mut args);
-                        let out = Command::new(path).args(&args).output()?;
+                        dbg!(&path);
+                        let out = Command::new(path).args(&args).output();
+                        dbg!(&out);
+                        let out = out?;
                         let stdout: String = String::from_utf8_lossy(&out.stdout).into();
                         let events = results::parse_test_results(&stdout);
-                        results.push(TestSuite::new(events, String::from(test)));
+                        let suite = TestSuite::new(events, String::from(test));
+                        if suite.tests > 0 {
+                            results.push(suite);
+                        }
                     }
                 }
             } else {
@@ -116,7 +128,7 @@ impl Runspec {
         output_path.set_extension("xml");
         let file = fs::File::create(output_path)?;
         let buf_writer = io::BufWriter::new(file);
-        crate::junit::write_as_xml(results, buf_writer);
+        crate::junit::write_as_xml(results, buf_writer)?;
         Ok(())
     }
 }
@@ -181,9 +193,9 @@ mod filters {
         f.is_executable()
     }
 
-    pub fn extension_is(f:&path::PathBuf, suffix: &str) -> bool {
-        let rust_ext = OsStr::new("rs");
-        path.extension() == Some(&rust_ext)
+    pub fn extension_is(f: &path::PathBuf, suffix: &str) -> bool {
+        let rust_ext = OsStr::new(suffix);
+        f.extension() == Some(&rust_ext)
     }
 
     pub fn filename_starts_with(f: &path::PathBuf, prefix: &str) -> bool {

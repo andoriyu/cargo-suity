@@ -27,7 +27,7 @@ impl Workflow {
             format: self.format.unwrap_or(right.format),
             output: self.output.unwrap_or(right.output.clone()),
             doc: self.doc.unwrap_or(right.doc),
-            unit: self.unit.unwrap_or(right.unit),
+            lib: self.unit.unwrap_or(right.lib),
             integration: self.integration.unwrap_or(right.integration.clone()),
         }
     }
