@@ -2,9 +2,10 @@
 
 [![Build Status](https://dev.azure.com/andoriyu/cargo-suity/_apis/build/status/andoriyu.cargo-suity?branchName=master)](https://dev.azure.com/andoriyu/cargo-suity/_build/latest?definitionId=3&branchName=master)
 [![codecov](https://codecov.io/gh/andoriyu/cargo-suity/branch/master/graph/badge.svg)](https://codecov.io/gh/andoriyu/cargo-suity)
+[![Version](https://img.shields.io/crates/v/cargo-suity.svg?style=flat)](https://crates.io/crates/cargo-suity)
 
-This tool helps you automate testing of you rust application on CI. Currently it can run defined workflows and 
-report results in JUnit format. It's using unstable `rust-test` feature and may break... Under the good suity executes
+This tool helps you automate testing of you rust application on CI. Currently it can run defined workflows and
+ report results in JUnit format. It's using unstable `rust-test` feature and may break... Under the good suity executes
  `cargo` as sub-process and parses its output.
 
 [![asciicast](https://asciinema.org/a/IXmGVIpJzg3lzyBCpYWe3bwwq.svg)](https://asciinema.org/a/IXmGVIpJzg3lzyBCpYWe3bwwq)
