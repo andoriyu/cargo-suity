@@ -36,7 +36,7 @@ impl Workflow {
     }
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug,Deserialize,Default)]
 pub struct Configuration {
     pub global: Runspec,
     pub workflow: HashMap<String, Workflow>,
@@ -48,8 +48,10 @@ impl Configuration {
         if self.workflow.is_empty() {
             return vec![self.get_default()];
         }
-        unimplemented!()
-        //self.workflow.values().cloned().map(|workflow| workflow.merge(&self.global)).collect()
+        self.workflow.iter()
+            .map(|(name,workflow)| (name.clone(), workflow.clone()))
+            .map(|(name, workflow)| workflow.merge(name, &self.global))
+            .collect()
     }
 
     /// Give specific runspec

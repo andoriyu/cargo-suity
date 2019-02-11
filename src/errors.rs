@@ -10,13 +10,14 @@ pub enum SuityError {
         name: String,
         workflow: String,
     },
-    #[fail(display="See cause for more information.")]
+    #[fail(display="Ran into IO Error. See cause for more information.")]
     IoError(#[fail(cause)] io::Error),
     #[fail(display="Failed to compile tests for {} workflow.", workflow)]
     FailedToCompile {
         workflow: String
     },
-
+    #[fail(display="Failed to parse configuration file. See cause for more information.")]
+    FailedToParseConfiguration(#[fail(cause)] toml::de::Error),
 }
 
 impl From<io::Error> for SuityError {

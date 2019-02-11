@@ -12,6 +12,15 @@ pub enum RunspecResult {
     Ok,
     Errors(u64),
 }
+
+impl RunspecResult {
+    pub fn as_exit_code(&self) -> i32 {
+        match self {
+            RunspecResult::Ok => 0,
+            RunspecResult::Errors(n) => *n as i32
+        }
+    }
+}
 /// Desired output format. Right not only JUnit is supported and it's the default format.
 #[derive(Debug, Copy, Clone,Deserialize)]
 pub enum OutputFormat {
@@ -27,18 +36,25 @@ impl Default for OutputFormat {
 #[derive(Debug,Deserialize)]
 pub struct Runspec {
     /// How to name this spec.
+    #[serde(default = "default::name")]
     pub name: String,
     /// List of features to pass to cargo.
+    #[serde(default = "default::features")]
     pub features: Vec<String>,
     /// Report format.
+    #[serde(default = "default::format")]
     pub format: OutputFormat,
     /// Output directory. Default `./test-results/`
+    #[serde(default = "default::output")]
     pub output: PathBuf,
     /// Run Doc-Tests or not. Default true.
+    #[serde(default = "default::doc")]
     pub doc: bool,
     /// Run Unit-Tests or not. Default true.
+    #[serde(default = "default::lib")]
     pub lib: bool,
     /// List of integration tests to run. Default all of them.
+    #[serde(default = "default::integration")]
     pub integration: Vec<String>
 }
 
@@ -198,6 +214,29 @@ fn map_to_binary(name: &String) -> Option<PathBuf> {
     }
 }
 
+mod default {
+    pub fn name() -> String {
+        super::Runspec::default().name.clone()
+    }
+    pub fn features() -> Vec<String> {
+        super::Runspec::default().features.clone()
+    }
+    pub fn format() -> super::OutputFormat {
+        super::Runspec::default().format.clone()
+    }
+    pub fn output() -> std::path::PathBuf {
+        super::Runspec::default().output.clone()
+    }
+    pub fn doc() -> bool {
+        super::Runspec::default().doc.clone()
+    }
+    pub fn lib() -> bool {
+        super::Runspec::default().lib.clone()
+    }
+    pub fn integration() -> Vec<String> {
+        super::Runspec::default().integration.clone()
+    }
+}
 
 mod filters {
     use std::cmp::Ordering;
