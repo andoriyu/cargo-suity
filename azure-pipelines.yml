@@ -24,12 +24,16 @@ jobs:
       displayName: Install rust
     - script: |
         CARGO=$HOME/.cargo/bin/cargo
-        RUSTFLAGS="-C link-dead-code" $CARGO test --no-run
         cargo install cargo-suity
-        RUSTFLAGS="-C link-dead-code" $CARGO suity
+      displayName: Install cargo-suity
+    - script: |
+        CARGO=$HOME/.cargo/bin/cargo
+        $CARGO suity
       displayName: Run Tests
     - script: |
         RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin -f
+      displayName: Install tarpaulin
+    - script: |
         sudo RUSTFLAGS="-C link-dead-code" $(which cargo) tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
       displayName: Run Coverage

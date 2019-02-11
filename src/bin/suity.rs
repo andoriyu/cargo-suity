@@ -22,6 +22,10 @@ fn main() {
         Ok(buf_writer) => {
             let result = runspec.execute(buf_writer).expect("Failed to run default configuration");
             print_results(&runspec, &result);
+            let total_number_of_failed: u64 = result.iter().map(|s| s.failures).sum();
+            if total_number_of_failed > 0 {
+                process::exit(1);
+            }
         },
         Err(e) => eprintln!("Failed to create output file because: {:?}", e)
     }
