@@ -59,7 +59,7 @@ integration = ["not_really_a_test"]
 | name         	| override name for  workflow         	| Any string                                                                  	| name part in `workflow.<name>` 	|
 | features     	| List of features to use            	| List of any strings                                                         	| crate's default features       	|
 | format       	| Test result output format          	| JUnit                                                                       	| JUnit                          	|
-| output       	| Where to save test results         	| any writable path                                                           	| `./test-results`               	|
+| output       	| Where to save test results         	| any writeable path                                                           	| `./test-results`               	|
 | doc          	| Test this library's documentation. 	| true / false                                                                	| true                           	|
 | lib          	| Test this package's library.       	| true / false                                                                	| true                           	|
 | integration 	|                                    	| an array of  integration tests files in `tests/` folder without extension.) 	| "*" (all of them)              	|
