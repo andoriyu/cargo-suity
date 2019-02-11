@@ -7,3 +7,4 @@ target*
 *.iml
 *.fmt.idea
 .test-results
+test-results

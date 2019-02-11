@@ -144,7 +144,7 @@ mod tests {
     use serde::{Deserialize};
     use serde_json;
 
-    use super::{EventKind,Event, Suite, parse_test_results};
+    use super::{EventKind,Event, parse_test_results};
 
     #[test]
     fn suite_started() {

@@ -1,12 +1,17 @@
 use std::path::PathBuf;
 use crate::junit::TestSuite;
-use std::process::{Command};
+use crate::errors::SuityError;
+use std::process::{Command, Output};
 use std::io;
 use std::fs;
 
 
 use crate::results;
 
+pub enum RunspecResult {
+    Ok,
+    Errors(u64),
+}
 /// Desired output format. Right not only JUnit is supported and it's the default format.
 #[derive(Debug, Copy, Clone,Deserialize)]
 pub enum OutputFormat {
@@ -21,6 +26,8 @@ impl Default for OutputFormat {
 
 #[derive(Debug,Deserialize)]
 pub struct Runspec {
+    /// How to name this spec.
+    pub name: String,
     /// List of features to pass to cargo.
     pub features: Vec<String>,
     /// Report format.
@@ -38,6 +45,7 @@ pub struct Runspec {
 impl Default for Runspec {
     fn default() -> Runspec {
         Runspec {
+            name: String::from("default"),
             features: Vec::new(),
             format: OutputFormat::default(),
             output: PathBuf::from("test-results/"),
@@ -53,83 +61,104 @@ impl Runspec {
     fn features_to_string(&self) -> String {
         itertools::join(self.features.iter(), " ")
     }
-    pub fn execute(&mut self, name: &str) -> Result<(),io::Error> {
+
+    pub fn execute<W: io::Write>(&mut self, output: W) -> Result<Vec<TestSuite>, SuityError> {
         let mut results: Vec<TestSuite> = Vec::with_capacity(5);
-        let shared_args = {
-            let mut args = vec![String::from("test")];
-            if !self.features.is_empty() {
-                args.push(String::from("--features"));
-                args.push(self.features_to_string());
-            }
-            args
-        };
+        let shared_args = self.get_shared_args();
+
+        let mut args = shared_args.clone();
+        args.push(String::from("--no-run"));
+        let status = Command::new("cargo").args(args).status()?;
+        if ! status.success() {
+            return Err(SuityError::FailedToCompile{workflow: self.name.clone()})
+        }
         if self.lib {
-            let mut args = {
-                let mut new_args = shared_args.clone();
-                new_args.extend(vec![
-                    String::from("--lib"),
-                ]);
-                new_args
-            };
+            let mut args = shared_args.clone();
+            args.push(String::from("--lib"));
             args.push(String::from("--"));
             add_common_args(&mut args);
-            let out = Command::new("cargo").args(&args).output()?;
-            let stdout: String = String::from_utf8_lossy(&out.stdout).into();
-            let events = results::parse_test_results(&stdout);
-            let suite = TestSuite::new(events, String::from("Lib-tests"));
-            if suite.tests > 0 {
+
+            let test_suite_name = format!("[{}] Lib-tests", self.name).to_string();
+
+            if let Some(suite) = Runspec::run_cargo(&mut args, test_suite_name)? {
                 results.push(suite);
             }
         }
         if self.doc {
-            let mut args = {
-                let mut new_args = shared_args.clone();
-                new_args.push(String::from("--doc"));
-                new_args
-            };
+            let mut args = shared_args.clone();
+            args.push(String::from("--doc"));
             args.push(String::from("--"));
             add_common_args(&mut args);
-            let out = Command::new("cargo").args(&args).output()?;
-            let stdout: String = String::from_utf8_lossy(&out.stdout).into();
-            let events = results::parse_test_results(&stdout);
-            let suite = TestSuite::new(events, String::from("Doc-tests"));
-            if suite.tests > 0 {
+            let test_suite_name = format!("[{}] Doc-tests", self.name).to_string();
+
+            if let Some(suite) = Runspec::run_cargo(&mut args, test_suite_name)? {
                 results.push(suite);
             }
         }
 
         if !self.integration.is_empty() {
-            if self.integration == vec!["*"] {
-                let tests = get_integration_tests();
-                dbg!(&tests);
-                for test in tests {
-                    if let Some(path) = map_to_binary(&test) {
-                        let mut args = Vec::with_capacity(3);
-                        add_common_args(&mut args);
-                        dbg!(&path);
-                        let out = Command::new(path).args(&args).output();
-                        dbg!(&out);
-                        let out = out?;
-                        let stdout: String = String::from_utf8_lossy(&out.stdout).into();
-                        let events = results::parse_test_results(&stdout);
-                        let suite = TestSuite::new(events, String::from(test));
-                        if suite.tests > 0 {
-                            results.push(suite);
-                        }
+            let tests = {
+                if self.integration == vec!["*"] {
+                    get_integration_tests()
+                } else {
+                    self.integration.clone()
+                }
+            };
+            for name in tests {
+                if name != "*" {
+                    if let Some(suite) = self.run_integration_test(&name)? {
+                        results.push(suite);
                     }
                 }
-            } else {
-                unimplemented!();
             }
         }
+        crate::junit::write_as_xml(&results, output)?;
+        Ok(results)
+    }
+
+    fn run_integration_test(&mut self, test: &String) -> Result<Option<TestSuite>, SuityError> {
+        let test_suite_name = format!("[{}] {}", self.name, &test).to_string();
+        if let Some(path) = map_to_binary(&test) {
+            let mut args = Vec::with_capacity(3);
+            add_common_args(&mut args);
+            let out = Command::new(path).args(&args).output()?;
+            Runspec::parse_test_output(test_suite_name, &out)
+        } else {
+            Err(SuityError::TestBinaryNotFound{name: test.clone(), workflow: self.name.clone()})
+        }
+    }
+
+    fn run_cargo(args: &Vec<String>, test_suite_name: String) -> Result<Option<TestSuite>, SuityError> {
+        let out = Command::new("cargo").args(args).output()?;
+        Runspec::parse_test_output(test_suite_name, &out)
+    }
+
+    fn parse_test_output(test_suite_name: String, out: &Output) -> Result<Option<TestSuite>, SuityError> {
+        let stdout: String = String::from_utf8_lossy(&out.stdout).into();
+        let events = results::parse_test_results(&stdout);
+        let suite = TestSuite::new(events, test_suite_name)?;
+        if suite.tests > 0 {
+            Ok(Some(suite))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_shared_args(&mut self) -> Vec<String> {
+        let mut args: Vec<String> = vec![String::from("test")];
+        if !self.features.is_empty() {
+            args.push(String::from("--features"));
+            args.push(self.features_to_string());
+        }
+        args
+    }
+
+    pub fn get_output_file_path(&self) -> PathBuf {
         let mut output_path = PathBuf::new();
         output_path.push(&self.output);
-        output_path.push(name);
+        output_path.push(&self.name);
         output_path.set_extension("xml");
-        let file = fs::File::create(output_path)?;
-        let buf_writer = io::BufWriter::new(file);
-        crate::junit::write_as_xml(results, buf_writer)?;
-        Ok(())
+        output_path
     }
 }
 

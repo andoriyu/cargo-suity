@@ -1,6 +1,7 @@
 /// Support for export in JUnit format.
 
 use crate::results::{Event, EventKind};
+use crate::errors::SuityError;
 use std::io::{Write,self};
 use xml_writer::XmlWriter;
 
@@ -41,7 +42,7 @@ impl TestSuite {
     /// Create TestSuite from event stream.
     /// NOTE: Only works if event stream is related to a single testsuite. You have to run unit, doc
     /// and integration tests separately!
-    pub fn new(events: Vec<Event>, name: String) -> TestSuite {
+    pub fn new(events: Vec<Event>, name: String) -> Result<TestSuite,SuityError> {
 
         let mut suite = TestSuite {
             name,
@@ -62,7 +63,7 @@ impl TestSuite {
                             suite.tests = s.test_count.unwrap();
                             counter += 1;
                             if counter > 1 {
-                                panic!("Trying to convert muliple outputs")
+                                return Err(SuityError::MultipleTestRuns);
                             }
                         },
                         EventKind::Failed | EventKind::Ok => {
@@ -96,12 +97,12 @@ impl TestSuite {
                 }
             }
         }
-        suite
+        Ok(suite)
     }
 }
 
 
-pub fn write_as_xml<W: Write>(suites: Vec<TestSuite>, writer: W) -> Result<(),io::Error> {
+pub fn write_as_xml<W: Write>(suites: &Vec<TestSuite>, writer: W) -> Result<(),io::Error> {
     let mut xml = XmlWriter::new(writer);
     xml.dtd("utf-8")?;
     xml.begin_elem("testsuites")?;
@@ -111,10 +112,10 @@ pub fn write_as_xml<W: Write>(suites: Vec<TestSuite>, writer: W) -> Result<(),io
         xml.attr("errors", suite.errors.to_string().as_str())?;
         xml.attr("failures", suite.failures.to_string().as_str())?;
         xml.attr("tests", suite.tests.to_string().as_str())?;
-        for testcase in suite.test_cases {
+        for testcase in &suite.test_cases {
             xml.begin_elem("testcase")?;
             xml.attr("name", &testcase.name)?;
-            if let Some(failure) = testcase.failure {
+            if let Some(ref failure) = &testcase.failure {
                 xml.begin_elem("failure")?;
                 xml.attr_esc("message", &failure.message)?;
                 xml.end_elem()?;
@@ -156,7 +157,7 @@ mod tests {
             tests: 1,
             test_cases: vec![expected_test_case]
         };
-        let suite = TestSuite::new(events, name);
+        let suite = TestSuite::new(events, name).unwrap();
 
         assert_eq!(expected, suite);
     }
@@ -190,7 +191,7 @@ mod tests {
             tests: 2,
             test_cases: vec![expected_test_case, expected_test_case2]
         };
-        let suite = TestSuite::new(events, name);
+        let suite = TestSuite::new(events, name).unwrap();
 
         assert_eq!(expected, suite);
     }
@@ -207,16 +208,26 @@ mod tests {
 
         let name = String::from("Doc Tests");
         let events = parse_test_results(stdout);
-        let suite = TestSuite::new(events, name);
+        let suite = TestSuite::new(events, name).unwrap();
 
-        let mut suites = vec![suite];
+        let suites = vec![suite];
 
         let mut output = Vec::with_capacity(128);
 
-        write_as_xml(suites, &mut output);
-
-        println!("{}", String::from_utf8(output).unwrap());
-
-
+        write_as_xml(&suites, &mut output).unwrap();
+    }
+    #[test]
+    fn test_multiple_outputs() {
+        let stdout = r#"{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "parsers::test::test_zpools_on_single_zpool" }
+{ "type": "test", "name": "parsers::test::test_zpools_on_single_zpool", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "allowed_fail": 0, "ignored": 0, "measured": 0, "filtered_out": 40 }
+{ "type": "suite", "event": "started", "test_count": 1 }
+{ "type": "test", "event": "started", "name": "parsers::test::test_zpools_on_single_zpool" }
+{ "type": "test", "name": "parsers::test::test_zpools_on_single_zpool", "event": "ok" }
+{ "type": "suite", "event": "ok", "passed": 1, "failed": 0, "allowed_fail": 0, "ignored": 0, "measured": 0, "filtered_out": 40 }"#;
+        let events = parse_test_results(stdout);
+        let suite = TestSuite::new(events, String::from("should fail"));
+        assert!(suite.is_err());
     }
 }
