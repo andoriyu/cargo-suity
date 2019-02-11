@@ -33,6 +33,7 @@ jobs:
     - script: |
         RUSTFLAGS="--cfg procmacro2_semver_exempt" cargo install cargo-tarpaulin -f
       displayName: Install tarpaulin
+      condition: and(succeeded(),eq(variables['rustup_toolchain'], 'nightly'))
     - script: |
         sudo RUSTFLAGS="-C link-dead-code" $(which cargo) tarpaulin --out Xml
         bash <(curl -s https://codecov.io/bash)
