@@ -3,6 +3,8 @@
 set -ex
 
 main() {
+    cd _andoriyu_cargo-suity
+
     local src=$(pwd) \
           stage=$(mktemp -d) \
           out=$CRATE_NAME-$TRAVIS_TAG-$TARGET.tar.gz
