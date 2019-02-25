@@ -1,6 +1,6 @@
 [package]
 name = "cargo-suity"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Andrey Cherkashin <with.out@me.com>"]
 edition = "2018"
 description = "Utility to automate test runs and report results in JUnit format"
