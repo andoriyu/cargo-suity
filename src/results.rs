@@ -17,7 +17,8 @@ pub enum ItemKind {
 pub enum EventKind {
     Started,
     Ok,
-    Failed
+    Failed,
+    Ignored,
 }
 
 #[derive(Deserialize, Debug, Eq, PartialEq)]
