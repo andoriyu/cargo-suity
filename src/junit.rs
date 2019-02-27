@@ -59,6 +59,7 @@ impl TestSuite {
             match event {
                 Event::Suite(s) => {
                     match s.event {
+                        EventKind::Ignored => { /* no-op */ },
                         EventKind::Started => {
                             suite.tests = s.test_count.unwrap();
                             counter += 1;
@@ -74,6 +75,7 @@ impl TestSuite {
                 Event::Test(t) => {
                     match t.event {
                         EventKind::Started => { /* no-op */ },
+                        EventKind::Ignored => { /* no-op */ },
                         EventKind::Ok => {
                             suite.test_cases.push(
                                 TestCase {
