@@ -1,10 +1,9 @@
-use std::path::PathBuf;
-use crate::junit::TestSuite;
 use crate::errors::SuityError;
-use std::process::{Command, Output};
-use std::io;
+use crate::junit::TestSuite;
 use std::fs;
-
+use std::io;
+use std::path::PathBuf;
+use std::process::{Command, Output};
 
 use crate::results;
 
@@ -17,14 +16,14 @@ impl RunspecResult {
     pub fn as_exit_code(&self) -> i32 {
         match self {
             RunspecResult::Ok => 0,
-            RunspecResult::Errors(n) => *n as i32
+            RunspecResult::Errors(n) => *n as i32,
         }
     }
 }
 /// Desired output format. Right not only JUnit is supported and it's the default format.
-#[derive(Debug, Copy, Clone,Deserialize)]
+#[derive(Debug, Copy, Clone, Deserialize)]
 pub enum OutputFormat {
-    JUnit
+    JUnit,
 }
 
 impl Default for OutputFormat {
@@ -33,7 +32,7 @@ impl Default for OutputFormat {
     }
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Runspec {
     /// How to name this spec.
     #[serde(default = "default::name")]
@@ -55,7 +54,7 @@ pub struct Runspec {
     pub lib: bool,
     /// List of integration tests to run. Default all of them.
     #[serde(default = "default::integration")]
-    pub integration: Vec<String>
+    pub integration: Vec<String>,
 }
 
 impl Default for Runspec {
@@ -72,7 +71,6 @@ impl Default for Runspec {
     }
 }
 
-
 impl Runspec {
     fn features_to_string(&self) -> String {
         itertools::join(self.features.iter(), " ")
@@ -85,8 +83,10 @@ impl Runspec {
         let mut args = shared_args.clone();
         args.push(String::from("--no-run"));
         let status = Command::new("cargo").args(args).status()?;
-        if ! status.success() {
-            return Err(SuityError::FailedToCompile{workflow: self.name.clone()})
+        if !status.success() {
+            return Err(SuityError::FailedToCompile {
+                workflow: self.name.clone(),
+            });
         }
         if self.lib {
             let mut args = shared_args.clone();
@@ -140,16 +140,25 @@ impl Runspec {
             let out = Command::new(path).args(&args).output()?;
             Runspec::parse_test_output(test_suite_name, &out)
         } else {
-            Err(SuityError::TestBinaryNotFound{name: test.clone(), workflow: self.name.clone()})
+            Err(SuityError::TestBinaryNotFound {
+                name: test.clone(),
+                workflow: self.name.clone(),
+            })
         }
     }
 
-    fn run_cargo(args: &Vec<String>, test_suite_name: String) -> Result<Option<TestSuite>, SuityError> {
+    fn run_cargo(
+        args: &Vec<String>,
+        test_suite_name: String,
+    ) -> Result<Option<TestSuite>, SuityError> {
         let out = Command::new("cargo").args(args).output()?;
         Runspec::parse_test_output(test_suite_name, &out)
     }
 
-    fn parse_test_output(test_suite_name: String, out: &Output) -> Result<Option<TestSuite>, SuityError> {
+    fn parse_test_output(
+        test_suite_name: String,
+        out: &Output,
+    ) -> Result<Option<TestSuite>, SuityError> {
         let stdout: String = String::from_utf8_lossy(&out.stdout).into();
         let events = results::parse_test_results(&stdout);
         let suite = TestSuite::new(events, test_suite_name)?;
@@ -185,7 +194,11 @@ fn get_integration_tests() -> Vec<String> {
             .filter(filters::file_with_content)
             .map(filters::to_path)
             .filter(|path| filters::extension_is(path, "rs"))
-            .filter_map(|path| path.clone().file_stem().map(|osstr| String::from(osstr.to_string_lossy())))
+            .filter_map(|path| {
+                path.clone()
+                    .file_stem()
+                    .map(|osstr| String::from(osstr.to_string_lossy()))
+            })
             .collect()
     } else {
         Vec::new()
@@ -199,7 +212,7 @@ fn add_common_args(args: &mut Vec<String>) {
 }
 
 fn map_to_binary(name: &String) -> Option<PathBuf> {
-    if let Ok(entries) = fs::read_dir("target/debug") {
+    if let Ok(entries) = fs::read_dir("target/debug/deps") {
         let mut executables: Vec<PathBuf> = entries
             .filter_map(Result::ok)
             .filter(filters::file_with_content)
@@ -239,11 +252,11 @@ mod default {
 }
 
 mod filters {
+    use is_executable::IsExecutable;
     use std::cmp::Ordering;
+    use std::ffi::OsStr;
     use std::fs;
     use std::path;
-    use std::ffi::OsStr;
-    use is_executable::IsExecutable;
 
     pub fn file_with_content(f: &fs::DirEntry) -> bool {
         if let Ok(meta) = f.metadata() {
